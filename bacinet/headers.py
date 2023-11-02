@@ -57,10 +57,11 @@ def strict_transport_security(response: Response) -> Response:
 	for dir in option.keys():
 		match dir:
 			case "maxAge": directives.append(f"maxAge={option['maxAge']}")
-			case "includeSubDomains" if option["includeSubDomains"] == True : directives.append("includeSubDomains")																		   
-			case "preload" if option["preload"] == True : directives.append("preload")
+			case "includeSubDomains": 
+				if option["includeSubDomains"] == True: directives.append("includeSubDomains")																		   
+			case "preload": 
+				if option["preload"] == True: directives.append("preload")
 			case _: raise HeaderOptionError(dir, "Strict-Transport-Security")
-		directives.append(f"{dir} {' '.join(option[dir])}")
 	response.headers["Strict-Transport-Security"] = ";".join(directives)
 	return response
 
@@ -68,7 +69,10 @@ def content_security_policy(response: Response) -> Response:
 	option: dict[str, list[str]] = cast(dict[str, list[str]], options["Content-Security-Policy"])
 	directives: list[str] = []
 	for dir in option.keys():
-		directives.append(f"{dir} {' '.join(option[dir])}")
+		if len(option[dir]) > 0 and option[dir][0] != "":
+			directives.append(f"{dir} {' '.join(option[dir])}")
+		else:
+			directives.append(dir)
 	response.headers["Content-Security-Policy"] = ";".join(directives)
 	return response
 
@@ -78,28 +82,28 @@ def referrer_policy(response: Response) -> Response:
 	option: str = cast(str, options["Referrer-Policy"])
 	if option not in allowed:
 		raise HeaderOptionError(option, "Referrer-Policy")	
-	response.headers["Referrer-Policy"] = ""
+	response.headers["Referrer-Policy"] = "no-referrer"
 	return response
 
 def cross_origin_embedder_policy(response: Response) -> Response:
 	option: str = cast(str, options["Cross-Origin-Embedder-Policy"])
 	if option not in ["require-corp", "credentialless"]:
 		raise HeaderOptionError(option, "Cross-Origin-Embedder-Policy")	
-	response.headers["Cross-Origin-Embedder-Policy"] = ""
+	response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
 	return response
 
 def x_permitted_cross_domain_policies(response: Response) -> Response:
 	option: str = cast(str, options["X-Permitted-Cross-Domain-Policies"])
 	if option not in ["none","master-only","by-content-type","all"]:
 		raise HeaderOptionError(option, "X-Permitted-Cross-Domain-Policies")	
-	response.headers["X-Permitted-Cross-Domain-Policies"] = ""
+	response.headers["X-Permitted-Cross-Domain-Policies"] = option
 	return response
 
 def cross_origin_opener_policy(response: Response) -> Response:
 	option: str = cast(str, options["Cross-Origin-Opener-Policy"])
 	if option not in ["same-origin", "same-origin-allow-popups", "unsafe-none"]:
 		raise HeaderOptionError(option, "Cross-Origin-Opener-Policy")	
-	response.headers["Cross-Origin-Opener-Policy"] = ""
+	response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
 	return response
 
 def x_frame_options(response: Response) -> Response:
