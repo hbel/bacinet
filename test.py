@@ -1,17 +1,14 @@
 
-from typing import Any
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from bacinet import apply
+
+from bacinet import BacinetMiddleware
+
 
 app = FastAPI()
 
-@app.middleware("http")
-async def add_bacinet(request: Request, call_next: Any) -> Response:
-    response = await call_next(request)
-    apply(response)
-    return response
 
+app.add_middleware(BacinetMiddleware)
 
 @app.get("/ping", status_code=200)
 async def ping() -> str:
@@ -22,7 +19,7 @@ client = TestClient(app)
 def test_ping():
     response = client.get("/ping") 
     assert response.status_code == 200
-    headers = response.headers
+    headers = response.headers 
     assert headers["X-Frame-Options"] == "DENY"
     assert headers["X-Permitted-Cross-Domain-Policies"] == "none"
     assert headers["X-DNS-Prefetch-Control"] == "off"

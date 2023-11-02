@@ -24,6 +24,19 @@ async def add_bacinet(request: Request, call_next):
     return response
 ```
 
+Alternatively, you can use an ASGI-conformant Middlware:
+
+```python
+from bacinet import BacinetMiddleware
+
+
+app = FastAPI()
+
+
+app.add_middleware(BacinetMiddleware)
+
+```
+
 To change the default options, import and change the options dictionary from bacinet:
 
 ```python

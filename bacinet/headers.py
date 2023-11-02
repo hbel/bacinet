@@ -1,6 +1,9 @@
 
 from typing import Any, cast
 from fastapi import Response
+from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.datastructures import MutableHeaders
 
 options: dict[str, str | dict[str, Any]] = {
 	"X-Frame-Options": "DENY", # DENY or SAMEORIGIN
@@ -49,7 +52,30 @@ def apply(response: Response) -> Response:
 	x_powered_by(response)
 	x_xss_protection(response)
 	x_content_type_options(response)
-	return response;
+	return response
+
+class BacinetMiddleware:
+	def __init__(
+		self,
+		app: ASGIApp,
+	) -> None:
+		self.app = app
+	
+	async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+		print(scope["type"])
+		if scope["type"] != "http":
+			await self.app(scope, receive, send)
+			
+		async def handle_outgoing_request(message: Any) -> None:
+			if message['type'] == 'http.response.start':
+				response = Response()
+				apply(response)
+				headers = MutableHeaders(scope=message)
+				for key, value in response.headers.items():
+					headers.append(key, value)
+				await send(message)
+		
+		await self.app(scope, receive, handle_outgoing_request)
 
 def strict_transport_security(response: Response) -> Response:
 	option: dict[str, Any] = cast(dict[str, Any], options["Strict-Transport-Security"])
@@ -62,6 +88,8 @@ def strict_transport_security(response: Response) -> Response:
 			case "preload": 
 				if option["preload"] == True: directives.append("preload")
 			case _: raise HeaderOptionError(dir, "Strict-Transport-Security")
+	print(response)
+			
 	response.headers["Strict-Transport-Security"] = ";".join(directives)
 	return response
 
