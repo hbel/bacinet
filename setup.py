@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="bacinet",
-    version="0.0.4",
+    version="0.0.5",
     author="Hendrik Belitz",
     author_email="hendrik@hendrikbelitz.de",
     description="Setting up security-relevant response headers in FastAPI",
@@ -26,4 +26,8 @@ setuptools.setup(
     project_urls={
         'Homepage': 'https://github.com/hbel/bacinet',
     },
+    package_data = {
+        'bacinet': ['py.typed'],
+    }
 )
+
