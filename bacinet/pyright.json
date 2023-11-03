@@ -1,0 +1,28 @@
+{
+	"include": [
+	  "."
+	],
+	
+	"exclude": [
+	  "**/__pycache__",
+	  "**/stubs"
+	],
+  
+	"defineConstant": {
+	  "DEBUG": true
+	},
+  
+	"stubPath": "./stubs",
+	
+	"reportMissingImports": true,
+	"reportMissingTypeStubs": true,
+	"reportUnusedImports": false,
+  
+	"pythonVersion": "3.6",
+	
+	"executionEnvironments": [
+	  {
+		"root": "."
+	  }
+	]
+  }

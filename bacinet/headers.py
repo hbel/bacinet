@@ -1,43 +1,10 @@
 
 from typing import Any, cast
-from fastapi import Response
-from starlette.responses import Response
-from starlette.types import ASGIApp, Receive, Scope, Send
-from starlette.datastructures import MutableHeaders
 
-options: dict[str, str | dict[str, Any]] = {
-	"X-Frame-Options": "DENY", # DENY or SAMEORIGIN
-	"X-Permitted-Cross-Domain-Policies": "none", # none, master-only, by-content-type, all
-	"X-DNS-Prefetch-Control": "off", # on, off
-	"Cross-Origin-Resource-Policy": "same-origin", # "same-origin", "same-site", "cross-origin"
-	"Cross-Origin-Opener-Policy": "same-origin", # "same-origin", "same-origin-allow-popups", "unsafe-none"
-	"Cross-Origin-Embedder-Policy": "require-corp", # "require-corp", "credentialless"
-	"Referrer-Policy": "no-referrer", # "no-referrer", "no-referrer-when-downgrade", "same-origin", "origin", "strict-origin", "origin-when-cross-origin", "strict-origin-when-cross-origin", "unsafe-url", ""
-	"Content-Security-Policy": {
-		"default-src": ["'self'"],
-		"base-uri": ["'self'"],
-		"font-src": ["'self'", "https:", "data:"],
-		"form-action": ["'self'"],
-		"frame-ancestors": ["'self'"],
-		"img-src": ["'self'", "data:"],
-		"object-src": ["'none'"],
-		"script-src": ["'self'"],
-		"script-src-attr": ["'none'"],
-		"style-src": ["'self'", "https:", "'unsafe-inline'"],
-		"upgrade-insecure-requests": []
-	},
-	"Strict-Transport-Security": {
-		"maxAge": 15552000,
-		"includeSubDomains": True,
-		"preload": False
-	}
-}
+from .header_options import options
+from .exceptions import HeaderOptionError
 
-class HeaderOptionError(Exception):
-	def __init__(self, option: str, header_name: str) -> None:
-		super().__init__(f"Unknown option {option} for {header_name} header")
-
-def apply(response: Response) -> Response:
+def apply(response: dict[str, str]) -> None:
 	strict_transport_security(response)
 	content_security_policy(response)
 	referrer_policy(response)
@@ -52,32 +19,8 @@ def apply(response: Response) -> Response:
 	x_powered_by(response)
 	x_xss_protection(response)
 	x_content_type_options(response)
-	return response
 
-class BacinetMiddleware:
-	def __init__(
-		self,
-		app: ASGIApp,
-	) -> None:
-		self.app = app
-	
-	async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-		print(scope["type"])
-		if scope["type"] != "http":
-			await self.app(scope, receive, send)
-			
-		async def handle_outgoing_request(message: Any) -> None:
-			if message['type'] == 'http.response.start':
-				response = Response()
-				apply(response)
-				headers = MutableHeaders(scope=message)
-				for key, value in response.headers.items():
-					headers.append(key, value)
-				await send(message)
-		
-		await self.app(scope, receive, handle_outgoing_request)
-
-def strict_transport_security(response: Response) -> Response:
+def strict_transport_security(response: dict[str, str]) -> None:
 	option: dict[str, Any] = cast(dict[str, Any], options["Strict-Transport-Security"])
 	directives: list[str] = []
 	for dir in option.keys():
@@ -88,12 +31,10 @@ def strict_transport_security(response: Response) -> Response:
 			case "preload": 
 				if option["preload"] == True: directives.append("preload")
 			case _: raise HeaderOptionError(dir, "Strict-Transport-Security")
-	print(response)
 			
-	response.headers["Strict-Transport-Security"] = ";".join(directives)
-	return response
+	response["Strict-Transport-Security"] = ";".join(directives)
 
-def content_security_policy(response: Response) -> Response:
+def content_security_policy(response: dict[str, str]) -> None:
 	option: dict[str, list[str]] = cast(dict[str, list[str]], options["Content-Security-Policy"])
 	directives: list[str] = []
 	for dir in option.keys():
@@ -101,78 +42,68 @@ def content_security_policy(response: Response) -> Response:
 			directives.append(f"{dir} {' '.join(option[dir])}")
 		else:
 			directives.append(dir)
-	response.headers["Content-Security-Policy"] = ";".join(directives)
-	return response
+	response["Content-Security-Policy"] = ";".join(directives)
 
-def referrer_policy(response: Response) -> Response:
+def referrer_policy(response: dict[str, str]) -> None:
 	# TODO It should be allowed to set more than one referrer policy (array option)
 	allowed = ["no-referrer", "no-referrer-when-downgrade", "same-origin", "origin", "strict-origin", "origin-when-cross-origin", "strict-origin-when-cross-origin", "unsafe-url", ""]
 	option: str = cast(str, options["Referrer-Policy"])
 	if option not in allowed:
 		raise HeaderOptionError(option, "Referrer-Policy")	
-	response.headers["Referrer-Policy"] = "no-referrer"
-	return response
+	response["Referrer-Policy"] = "no-referrer"
 
-def cross_origin_embedder_policy(response: Response) -> Response:
+def cross_origin_embedder_policy(response: dict[str, str]) -> None:
 	option: str = cast(str, options["Cross-Origin-Embedder-Policy"])
 	if option not in ["require-corp", "credentialless"]:
 		raise HeaderOptionError(option, "Cross-Origin-Embedder-Policy")	
-	response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
-	return response
+	response["Cross-Origin-Embedder-Policy"] = option
 
-def x_permitted_cross_domain_policies(response: Response) -> Response:
+def x_permitted_cross_domain_policies(response: dict[str, str]) -> None:
 	option: str = cast(str, options["X-Permitted-Cross-Domain-Policies"])
 	if option not in ["none","master-only","by-content-type","all"]:
 		raise HeaderOptionError(option, "X-Permitted-Cross-Domain-Policies")	
-	response.headers["X-Permitted-Cross-Domain-Policies"] = option
-	return response
+	response["X-Permitted-Cross-Domain-Policies"] = option
 
-def cross_origin_opener_policy(response: Response) -> Response:
+def cross_origin_opener_policy(response: dict[str, str]) -> None:
 	option: str = cast(str, options["Cross-Origin-Opener-Policy"])
 	if option not in ["same-origin", "same-origin-allow-popups", "unsafe-none"]:
 		raise HeaderOptionError(option, "Cross-Origin-Opener-Policy")	
-	response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-	return response
+	response["Cross-Origin-Opener-Policy"] = option
 
-def x_frame_options(response: Response) -> Response:
+def x_frame_options(response: dict[str, str]) -> None:
 	option: str = cast(str, options["X-Frame-Options"])
 	if option not in ["DENY", "SAMEORIGIN", "SAME-ORIGIN"]:
 		raise HeaderOptionError(option, "X-Frame-Options")
 	if option == "SAME-ORIGIN":
 		option = "SAMEORIGIN"
-	response.headers["X-Frame-Options"] = option
-	return response
+	response["X-Frame-Options"] = option
 
-def cross_origin_resource_policy(response: Response) -> Response:
+def cross_origin_resource_policy(response: dict[str, str]) -> None:
 	option: str = cast(str, options["Cross-Origin-Resource-Policy"])
 	if option not in ["same-origin", "same-site", "cross-origin"]:
 		raise HeaderOptionError(option, "Cross-Origin-Resource-Policy")
-	response.headers["Cross-Origin-Resource-Policy"] = option
-	return response
+	response["Cross-Origin-Resource-Policy"] = option
 
-def x_dns_prefetch_control(response: Response) -> Response:
+def x_dns_prefetch_control(response: dict[str, str]) -> None:
 	option: str = cast(str, options["X-DNS-Prefetch-Control"])
 	if option not in ["off", "on"]:
 		raise HeaderOptionError(option, "X-DNS-Prefetch-Control")
-	response.headers["X-DNS-Prefetch-Control"] = option
-	return response
+	response["X-DNS-Prefetch-Control"] = option
 
-def x_download_options(response: Response) -> Response:
-	response.headers["X-Download-Options"] = "noopen"
-	return response
+def x_download_options(response: dict[str, str]) -> None:
+	response["X-Download-Options"] = "noopen"
 
-def x_powered_by(response: Response) -> Response:
-	del response.headers["X-Powered-By"]
-	return response
+def x_powered_by(response: dict[str, str]) -> None:
+	if response.get("X-Powered-By") != None:
+		del response["X-Powered-By"]
+	if response.get("x-powered-by") != None:
+		del response["x-powered-by"]
 
-def x_xss_protection(response: Response) -> Response:
-	response.headers["X-XSS-Protection"] = "0"
-	return response
+def x_xss_protection(response: dict[str, str]) -> None:
+	response["X-XSS-Protection"] = "1"
 
-def x_content_type_options(response: Response) -> Response:
-	response.headers["X-Content-Type-Options"] = "nosniff"
-	return response
+def x_content_type_options(response: dict[str, str]) -> None:
+	response["X-Content-Type-Options"] = "nosniff"
 
-def origin_agent_cluster(response: Response) -> Response:
-	response.headers["Origin-Agent-Cluster"] = "?1"
-	return response
+def origin_agent_cluster(response: dict[str, str]) -> None:
+	response["Origin-Agent-Cluster"] = "?1"
