@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="bacinet",
-    version="0.0.5",
+    version="0.0.6",
     author="Hendrik Belitz",
     author_email="hendrik@hendrikbelitz.de",
     description="Setting up security-relevant response headers in FastAPI",

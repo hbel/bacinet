@@ -29,6 +29,6 @@ class BacinetMiddleware:
 				self.apply_headers(response_headers)
 				for key, value in response_headers.items():
 					headers.append(key, value)
-				await send(message)
+			await send(message)
 		
 		await self.app(scope, receive, handle_outgoing_request)
